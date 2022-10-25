@@ -4,7 +4,7 @@
     <AssemblyName>ExtendedInstaller</AssemblyName>
     <Authors>iRebbok,ModMaster9000</Authors>
     <Copyright>Copyright © $(Authors) 2022 - $([System.DateTime]::Now.ToString("yyyy"))</Copyright>
-    <Version>1.0.5</Version>
+    <Version>1.0.7</Version>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
@@ -35,9 +35,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Reference Include="Assembly-CSharp">
-      <HintPath>imports\Assembly-CSharp.dll</HintPath>
-    </Reference>
     <Reference Include="Newtonsoft.Json">
       <HintPath>imports\Newtonsoft.Json.dll</HintPath>
     </Reference>

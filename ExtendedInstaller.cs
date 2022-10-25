@@ -19,31 +19,31 @@ namespace ExtendedInstaller
         {
             try
             {
-                var assemblyPath = Path.GetFullPath(args[0]);
-                var assemblyReplaceAddWithPath = Path.GetFullPath(args[2]);
+                string argTargetAssemblyPath = Path.GetFullPath(args[0]);
+                string[] argMethodsToMakePublic = args[1].Split(',');
+                string[] argFieldsToMakePublic = args[2].Split(',');
+                string argTargetAssemblyReplaceWithPath = Path.GetFullPath(args[3]);
 
                 // make backup
-                string currentDirectory = Path.GetDirectoryName(assemblyPath);
-                string fullPathOnly = Path.GetFullPath(currentDirectory);
-                string backupPath = fullPathOnly + "\\" + Path.GetFileNameWithoutExtension(assemblyPath) + "_backup.dll";
-                if (!File.Exists(backupPath))
+                string backupFilePath = Path.GetDirectoryName(argTargetAssemblyPath) + "\\" + Path.GetFileNameWithoutExtension(argTargetAssemblyPath) + "_backup.dll";
+                if (!File.Exists(backupFilePath))
                 {
-                    File.Copy(assemblyPath, backupPath);
-                    Console.WriteLine("BACKUP MADE AT -> " + backupPath);
+                    File.Copy(argTargetAssemblyPath, backupFilePath);
+                    Console.WriteLine("BACKUP MADE AT -> " + backupFilePath);
                 }
 
-                using var alterer = new Alterer(assemblyPath, assemblyReplaceAddWithPath);
+                using var alterer = new Alterer(argTargetAssemblyPath, argMethodsToMakePublic, argFieldsToMakePublic, argTargetAssemblyReplaceWithPath);
 
                 Console.WriteLine("Running Extended Installer");
-                var result = alterer.Run(args[1]);
+                var result = alterer.Run();
 
 
-                alterer.Write(assemblyPath);
-                PrintResult(assemblyPath, result);
+                alterer.Write(argTargetAssemblyPath);
+                PrintResult(argTargetAssemblyPath, result);
 
                 Dictionary<String, object> Extended_Install_Configurations = new Dictionary<string, object>();
                 Extended_Install_Configurations.Add("extended_installation_completed", true);
-                Extended_Install_Configurations.Add("extended_installation_main_dll_file_size", new System.IO.FileInfo(assemblyPath).Length);
+                Extended_Install_Configurations.Add("extended_installation_main_dll_file_size", new System.IO.FileInfo(argTargetAssemblyPath).Length);
                 File.WriteAllText("..\\Extended_Install_Configurations.txt", JsonConvert.SerializeObject(Extended_Install_Configurations));
             }
             catch (Exception e)
@@ -115,18 +115,22 @@ namespace ExtendedInstaller
 
         private readonly AssemblyDefinition _assembly;
         private readonly AssemblyDefinition _assemblyReplaceWith;
+        private readonly string[] _methodsToMakePublic;
+        private readonly string[] _fieldsToMakePublic;
 
-        public Alterer(string pathTargetAssembly, string pathReplaceWithAssembly)
+        public Alterer(string pathTargetAssembly, string[] methodsToMakePublic, string[] argFieldsToMakePublic, string pathReplaceWithAssembly)
         {
             _assembly = MainUtility.loadAssembly(pathTargetAssembly);
+            _methodsToMakePublic = methodsToMakePublic;
+            _fieldsToMakePublic = argFieldsToMakePublic;
             _assemblyReplaceWith = MainUtility.loadAssembly(pathReplaceWithAssembly);
         }
 
-        public AltererResult Run(String methodsOrFieldsToMakePublic)
+        public AltererResult Run()
         {
             var result = new AltererResult();
             Console.WriteLine("Publicizing stuff");
-            DoPublicize(result, methodsOrFieldsToMakePublic.Split(','));
+            DoPublicize(result);
             //Console.WriteLine("Replacing/Patching stuff");
             //Console.WriteLine("Methods to replace/patch: " + methodsToReplace);
             //methodsToReplaceArray = methodsToReplace.Split(',');
@@ -139,18 +143,17 @@ namespace ExtendedInstaller
             _assembly.Write(path);
         }
 
-        private void DoPublicize(AltererResult value, String[] methodsOrFieldsToMakePublic)
+        private void DoPublicize(AltererResult value)
         {
             //DoPublicizeTypes(value);
             //DoPublicizeNestedTypes(value);
-            DoPublicizeFields(value, methodsOrFieldsToMakePublic);
+            DoPublicizeFields(value, _fieldsToMakePublic);
             // Publicize events before publicizing methods cuz events are literally two methods & one field
             //DoFixupEvents(value);
             // Publicize properties before publicizing methods cuz setters/getters are methods
-            DoPublicizePropertySetters(value, methodsOrFieldsToMakePublic);
-            DoPublicizePropertyGetters(value, methodsOrFieldsToMakePublic);
-
-            DoPublicizeMethods(value, methodsOrFieldsToMakePublic);
+            DoPublicizePropertySetters(value, _methodsToMakePublic);
+            DoPublicizePropertyGetters(value, _methodsToMakePublic);
+            DoPublicizeMethods(value, _methodsToMakePublic);
 
         }
 
@@ -391,6 +394,7 @@ namespace ExtendedInstaller
                     (p) => p.GetMethod.IsPublic = true,
                     value.BumpPropertyGetters));
 
+        // TODO Does not work for methods that reference valueTypes or methods outside of target Assembly dll file
         private void DoReplaceMethods(AltererResult value, string[] methodsToReplace) =>
             ArrayProcessor<TypeDefinition, MethodDefinition>(GetTypes(_assembly),
                 (t) => t.Methods,
